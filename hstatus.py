@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
+# -*- 
 
 from __future__ import print_function
 import sys
@@ -30,23 +30,29 @@ def is_hilink(device_ip):
 
 def get_token(device_ip):
     token = None
+    sessionID = None
     try:
-        r = requests.get(url='http://' + device_ip + '/api/webserver/token', allow_redirects=False, timeout=(2.0,2.0))
+        r = requests.get(url='http://' + device_ip + '/api/webserver/SesTokInfo', allow_redirects=False, timeout=(2.0,2.0))
     except requests.exceptions.RequestException as e:
         return token
+        return (token, sessionID)
     try:        
         d = xmltodict.parse(r.text, xml_attribs=True)
-        if 'response' in d and 'token' in d['response']:
-            token = d['response']['token']
+        if 'response' in d and 'TokInfo' in d['response']:
+            token = d['response']['TokInfo']
+            d = xmltodict.parse(r.text, xml_attribs=True)
+        if 'response' in d and 'SesInfo' in d['response']:
+            sessionID = d['response']['SesInfo']    
     except:
         pass
-    return token
+    return (token, sessionID)
     
 
-def call_api(device_ip, token, resource, xml_attribs=True):
+def call_api(device_ip, token, sessionID, resource, xml_attribs=True):
     headers = {}
-    if token is not None:
+    if token is not None and sessionID is not None:
         headers = {'__RequestVerificationToken': token}
+        headers = {'Cookie': sessionID}
     try:
         r = requests.get(url='http://' + device_ip + resource, headers=headers, allow_redirects=False, timeout=(2.0,2.0))
     except requests.exceptions.RequestException as e:
@@ -163,8 +169,8 @@ def get_signal_level(level):
         result = u'\u2581' + u'\u2583' + u'\u2584' + u'\u2586' + u'\u2588'
     return result
 
-def print_traffic_statistics(device_ip, token, connection_status):
-    d = call_api(device_ip, token, '/api/monitoring/traffic-statistics')
+def print_traffic_statistics(device_ip, token, sessionID, connection_status):
+    d = call_api(device_ip, token, sessionID, '/api/monitoring/traffic-statistics')
     current_connect_time = d['response']['CurrentConnectTime']
     current_upload = d['response']['CurrentUpload']
     current_download = d['response']['CurrentDownload']
@@ -178,8 +184,8 @@ def print_traffic_statistics(device_ip, token, connection_status):
     print('  Total downloaded: ' + to_size(float(total_download)))
     print('  Total uploaded: ' + to_size(float(total_upload)))
 
-def print_connection_status(device_ip, token):
-    d = call_api(device_ip, token, '/api/monitoring/status')
+def print_connection_status(device_ip, token, sessionID):
+    d = call_api(device_ip, token, sessionID, '/api/monitoring/status')
     connection_status = d['response']['ConnectionStatus']
     signal_strength = d['response']['SignalStrength']
     signal_level = d['response']['SignalIcon']
@@ -216,9 +222,8 @@ def print_connection_status(device_ip, token):
 
     return connection_status
 
-def print_device_info(device_ip, token):
-    d = call_api(device_ip, token, '/api/device/information')
-    device_name = d['response']['DeviceName']
+def print_device_info(device_ip, token, sessionID):
+    d = call_api(device_ip, token, sessionID, '/api/device/information')
     serial_number = d['response']['SerialNumber']
     imei = d['response']['Imei']
     hardware_version = d['response']['HardwareVersion']
@@ -228,7 +233,7 @@ def print_device_info(device_ip, token):
     mac_address2 = d['response']['MacAddress2']
     product_family = d['response']['ProductFamily']
  
-    print('Huawei ' + device_name + ' ' + product_family + ' Modem (IMEI: ' + imei + ')')
+    print('Huawei ' + serial_number + ' ' + product_family + ' Modem (IMEI: ' + imei + ')')
     print('  Hardware version: ' + hardware_version)
     print('  Software version: ' + software_version)
     print('  Web UI version: ' + webui_version)
@@ -239,19 +244,18 @@ def print_device_info(device_ip, token):
     else:
         print('')
 
-def print_provider(device_ip, token, connection_status):
+def print_provider(device_ip, token, sessionID, connection_status):
     if connection_status == '901':
-        d = call_api(device_ip, token, '/api/net/current-plmn')
+        d = call_api(device_ip, token, sessionID, '/api/net/current-plmn')
         state = d['response']['State']
         provider_name = d['response']['FullName']
         print('    Network operator: ' + provider_name)
 
-def print_unread(device_ip, token):
-    d = call_api(device_ip, token, '/api/monitoring/check-notifications')
+def print_unread(device_ip, token, sessionID):
+    d = call_api(device_ip, token, sessionID, '/api/monitoring/check-notifications')
     unread_messages = d['response']['UnreadMessage']
     if unread_messages is not None and int(unread_messages) > 0:
-        print('  Unread SMS: ' + unread_messages)
-
+        print('    Unread SMS: ' + unread_messages)
 device_ip = '192.168.1.1'
 if len(sys.argv) == 2:
     device_ip = sys.argv[1]
@@ -268,10 +272,10 @@ else:
         else:
             device_ip = '192.168.8.1'
 
-token = get_token(device_ip)
-print_device_info(device_ip, token)
-connection_status = print_connection_status(device_ip, token)
-print_provider(device_ip, token, connection_status)
-print_traffic_statistics(device_ip, token, connection_status)
-print_unread(device_ip, token)
+token, sessionID = get_token(device_ip)
+print_device_info(device_ip, token, sessionID)
+connection_status = print_connection_status(device_ip, token, sessionID)
+print_provider(device_ip, token, sessionID, connection_status)
+print_traffic_statistics(device_ip, token, sessionID, connection_status)
+#print_unread(device_ip, token, sessionID)
 print('')
