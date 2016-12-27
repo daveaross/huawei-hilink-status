@@ -4,7 +4,7 @@ huawei-hilink-status
 Unsophisticated Python command-line utility to show device information and the connection status from Huawei HiLink modems. Tested with 2 samples of Huawei's E3331 modem.
 
 ## Installation
-The utility uses the xmltodict module which can be installed using ```pip```:
+
 ```
 apt-get install python-pip
 pip install xmltodict
